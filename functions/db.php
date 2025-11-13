@@ -1,20 +1,23 @@
 <?php
-session_start();
 
-// Maniere avancée 
+declare(strict_types=1);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $dbhost = 'localhost';
-$dbname = 'departement_science_informatique';
+$dbname = 'campus_manager';
 $dbuser = 'root';
 $dbpassword = '';
 
 try {
-    // connection à la base de donnée
-    $db = new PDO('mysql:host=' . $dbhost . ';dbname=' . $dbname, $dbuser, $dbpassword, 
-    array(PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8', PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING));
-} catch (PDOexception $e) {
-    die("Une erreur est survenue lors de la connexion à la base des données");
+    $dsn = sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4', $dbhost, $dbname);
+    $db = new PDO($dsn, $dbuser, $dbpassword, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
+} catch (PDOException $e) {
+    http_response_code(500);
+    die("Erreur de connexion à la base de données. Veuillez vérifier la configuration.");
 }
-
-
-
-
