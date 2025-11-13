@@ -17,7 +17,7 @@
                 <a href="read.php" class="btn btn-lg bg-brand-600 border-brand-600 hover:bg-brand-500 hover:border-brand-500 text-white">
                     <i class="fa-solid fa-users-line mr-2"></i> Voir les étudiants
                 </a>
-                <a href="create.php" class="btn btn-lg btn-ghost border border-slate-700 text-slate-200 hover:text-brand-200">
+                <a href="./create.php" class="btn btn-lg btn-ghost border border-slate-700 text-slate-200 hover:text-brand-200">
                     <i class="fa-solid fa-plus mr-2"></i> Ajouter un profil
                 </a>
             </div>
