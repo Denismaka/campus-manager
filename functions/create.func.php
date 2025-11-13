@@ -1,82 +1,46 @@
 <?php
-// require('db.php');
 
-if (isset($_POST['submit'])) { // Teste si les formulaire est soumis 
+declare(strict_types=1);
 
-    $nom = htmlspecialchars(trim($_POST['nom_etudiant']));
-    $prenom = htmlspecialchars(trim($_POST['prenom_etudiant']));
-    $id_promotion = intval($_POST['id_promotion']);
-    $matricule = 1;
-    $date_naissance = htmlspecialchars(trim($_POST['date_naissance']));
+require_once __DIR__ . '/students.php';
 
-    if (!empty($nom) && !empty($prenom) && !empty($date_naissance)) {
+$promotions = getPromotions();
+$studentCount = getStudentCount();
+$message = null;
+$formData = [
+    'nom' => '',
+    'prenom' => '',
+    'matricule' => '',
+    'date_naissance' => '',
+    'id_promotion' => '',
+];
 
-        createEtudiant($nom, $prenom, $id_promotion, $matricule, $date_naissance);
-        
-        $message = "<h2 style='color: green'>L'étudiant crée avec succéss</h2>";
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $nom = trim(filter_input(INPUT_POST, 'nom_etudiant', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '');
+    $prenom = trim(filter_input(INPUT_POST, 'prenom_etudiant', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '');
+    $matricule = trim(filter_input(INPUT_POST, 'matricule_etudiant', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '');
+    $dateNaissance = trim(filter_input(INPUT_POST, 'date_naissance') ?? '');
+    $idPromotion = (int) (filter_input(INPUT_POST, 'id_promotion', FILTER_VALIDATE_INT) ?? 0);
 
+    $formData = [
+        'nom' => $nom,
+        'prenom' => $prenom,
+        'matricule' => $matricule,
+        'date_naissance' => $dateNaissance,
+        'id_promotion' => $idPromotion,
+    ];
+
+    if ($nom && $prenom && $matricule && $dateNaissance && $idPromotion > 0) {
+        $created = createStudent($nom, $prenom, $idPromotion, $matricule, $dateNaissance);
+
+        if ($created) {
+            $_SESSION['flash_success'] = "L'étudiant a été créé avec succès.";
+            header('Location: read.php');
+            exit;
+        }
+
+        $message = "Une erreur est survenue, veuillez réessayer.";
     } else {
-        $message = "<h2 style='color: red'>Tous les champs ne sont pas remplis</h2>";
-    } 
-}
-// Cette fonction permet l'insertion d'un post dans la BDD
-function  createEtudiant($nom, $prenom, $id_promotion, $matricule, $date_naissance)
-{
-
-    global $db;
-    $sql = "INSERT INTO etudiant(nom_etudiant, prenom_etudiant, id_promotion, matricule_etudiant, date_naissance_etudiant, created) 
-            VALUES(:nom_etudiant, :prenom_etudiant, :id_promotion, :matricule_etudiant, :date_naissance_etudiant,  NOW())";
-    $req = $db->prepare($sql);
-    $c = ([
-        'nom_etudiant'               => $nom,
-        'prenom_etudiant'            => $prenom,
-        'id_promotion'               => $id_promotion,
-        'matricule_etudiant'         => $matricule,
-        'date_naissance_etudiant'    => $date_naissance
-    ]);
-
-    $response = $req->execute($c);
-    if ($response) {
-
-        header("Location: read.php");
-
-    } 
-   
-}
-
-// Categories
-function get_promotion()
-{
-    global $db;
-
-    // Avec une triple jointure
-    $req = $db->query("SELECT * FROM promotion  ORDER BY id_promotion DESC");
-
-    $results = [];
-    
-
-    while ($rows = $req->fetchObject()) {
-        $results[] = $rows;
+        $message = "Tous les champs doivent être remplis correctement.";
     }
-
-    return $results;
 }
-
-$promotions = get_promotion();
-
-// 1.Compteur des etudiants
-function Compteur_etudiant()
-{
-
-    global $db;
-
-    $sql = "SELECT id_promotion FROM promotion";
-    $req = $db->prepare($sql);
-    $req->execute();
-
-    $exist = $req->rowCount();
-
-    return $exist;
-}
-
-$Compteur_etudiants = Compteur_etudiant();

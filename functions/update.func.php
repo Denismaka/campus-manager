@@ -1,79 +1,53 @@
 <?php
-// require('db.php');
 
-if (isset($_POST['submit'])) {
+declare(strict_types=1);
 
-    $nom = htmlspecialchars(trim($_POST['nom_etudiant']));
-    $prenom = htmlspecialchars(trim($_POST['prenom_etudiant']));
-    $id_promotion = intval($_POST['id_promotion']);
-    $matricule = 1;
-    $date_naissance = htmlspecialchars(trim($_POST['date_naissance']));
-    $getId = $_GET['id_etudiant'];
+require_once __DIR__ . '/students.php';
 
-    if (!empty($nom) && !empty($prenom) && !empty($date_naissance)) {
+$message = null;
+$studentId = (int) ($_GET['id_etudiant'] ?? 0);
 
-        updateEtudiant($nom, $prenom, $id_promotion, $matricule, $date_naissance, $getId);
+if ($studentId <= 0) {
+    header('Location: read.php');
+    exit;
+}
+
+$student = getStudentById($studentId);
+
+if (!$student) {
+    $_SESSION['flash_error'] = "L'étudiant demandé est introuvable.";
+    header('Location: read.php');
+    exit;
+}
+
+$promotions = getPromotions();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $nom = trim(filter_input(INPUT_POST, 'nom_etudiant', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '');
+    $prenom = trim(filter_input(INPUT_POST, 'prenom_etudiant', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '');
+    $matricule = trim(filter_input(INPUT_POST, 'matricule_etudiant', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '');
+    $dateNaissance = trim(filter_input(INPUT_POST, 'date_naissance') ?? '');
+    $idPromotion = (int) (filter_input(INPUT_POST, 'id_promotion', FILTER_VALIDATE_INT) ?? 0);
+
+    if ($nom && $prenom && $matricule && $dateNaissance && $idPromotion > 0) {
+        $updated = updateStudent($studentId, $nom, $prenom, $idPromotion, $matricule, $dateNaissance);
+
+        if ($updated) {
+            $_SESSION['flash_success'] = "La fiche étudiant a été mise à jour.";
+            header('Location: readSingle.php?id_etudiant=' . $studentId);
+            exit;
+        }
+
+        $message = "Impossible de mettre à jour l'étudiant. Veuillez réessayer.";
     } else {
-        echo "Tous les champs ne sont pas remplis";
+        $message = "Tous les champs doivent être remplis correctement.";
     }
-}
 
-// Cette fonction permet l'insertion d'un post dans la BDD
-function  updateEtudiant($nom, $prenom, $id_promotion, $matricule, $date_naissance, $getId)
-{
-
-    global $db;
-    $c = ([
-        'nom_etudiant'               => $nom,
-        'prenom_etudiant'            => $prenom,
-        'id_promotion'               => $id_promotion,
-        'matricule_etudiant'         => $matricule,
-        'date_naissance_etudiant'    => $date_naissance,
-        'id_etudiant'                => $getId
+    $student = array_merge($student, [
+        'nom_etudiant' => $nom,
+        'prenom_etudiant' => $prenom,
+        'matricule_etudiant' => $matricule,
+        'date_naissance_etudiant' => $dateNaissance,
+        'id_promotion' => $idPromotion,
     ]);
-    $sql = "UPDATE etudiant SET nom_etudiant =:nom_etudiant, prenom_etudiant =:prenom_etudiant,  id_promotion=:id_promotion, matricule_etudiant=:matricule_etudiant, date_naissance_etudiant=:date_naissance_etudiant, created=NOW() WHERE id_etudiant = :id_etudiant";
-    $req = $db->prepare($sql);
-
-   $response = $req->execute($c); 
-    if ($response) {
-
-        header("Location: read.php");
-    }
-
 }
-function etudiantSingle()
-{
-    global $db;$sql = "SELECT * FROM etudiant JOIN promotion ON etudiant.id_promotion = promotion.id_promotion WHERE etudiant.id_etudiant='{$_GET['id_etudiant']}'";
-    $req = $db->query($sql);
-
-    $result = $req->fetchObject();
-    return $result;
-}
-
-
-
-
-$etudiant = etudiantSingle();
-
-
-function get_promotion()
-{
-    global $db;
-
-
-    // Avec une triple jointure
-    $req = $db->query("SELECT * FROM promotion  ORDER BY id_promotion DESC");
-
-    $results = [];
-
-    while ($rows = $req->fetchObject()) {
-        $results[] = $rows;
-    }
-
-    return $results;
-}
-
-$promotions = get_promotion();
-
-
-?>

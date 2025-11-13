@@ -1,100 +1,76 @@
 <?php
 
-if (isset($_POST['submit'])) { // Teste si les formulaire est soumis 
+declare(strict_types=1);
 
-    $nom = htmlspecialchars(trim($_POST['nom_user']));
-    $prenom = htmlspecialchars(trim($_POST['prenom_user']));
-    $email = htmlspecialchars(trim($_POST['email_user']));
-    $motpass = htmlspecialchars(trim($_POST['motpass_user']));
-    $motpass_repeat = htmlspecialchars(trim($_POST['motpass_repeat']));
+require_once __DIR__ . '/db.php';
 
-   
+$message = null;
 
-$token = token(30);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $nom = trim(filter_input(INPUT_POST, 'nom_user', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '');
+    $prenom = trim(filter_input(INPUT_POST, 'prenom_user', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '');
+    $email = trim(strtolower(filter_input(INPUT_POST, 'email_user', FILTER_VALIDATE_EMAIL) ?? ''));
+    $password = filter_input(INPUT_POST, 'motpass_user') ?? '';
+    $passwordConfirmation = filter_input(INPUT_POST, 'motpass_repeat') ?? '';
 
-if (!empty($nom) && !empty($prenom) && !empty($email) 
-&& !empty($motpass) && !empty($motpass_repeat)) {
-
-    $motpasslenght = strlen($motpass);
-    if ($motpasslenght >= 8) {
-
-        if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            if (email_taken($email)) {
-
-                $message = "<font color='red'>Cette adresse email est déjà utilisée !</font>";
-            } else {
-
-                if ($motpass == $motpass_repeat) {
-
-                    $longeurCle = 15;
-                    $Cle = "";
-                    for ($i = 1; $i < $longeurCle; $i++) {
-
-                        $Cle .= mt_rand(0, 9);
-                    }
-
-
-                    userRegister($nom, $prenom, $email, $motpass, $Cle, $token);
-                    $message = "<font color='green'>Utilisateur enregistré avec succès !</font>";
-
-                } else {
-                    $message = "<font color='red'>Les deux mots de passes ne sont pas identiques !</font>";
-                }
-            }
+    if ($nom && $prenom && $email && $password && $passwordConfirmation) {
+        if (strlen($password) < 8) {
+            $message = "Le mot de passe doit contenir au minimum 8 caractères.";
+        } elseif ($password !== $passwordConfirmation) {
+            $message = "Les mots de passe ne correspondent pas.";
+        } elseif (emailExists($email)) {
+            $message = "Cette adresse email est déjà utilisée.";
         } else {
-            $message = "<font color='red'>Votre adresse email n'est pas valide !</font>";
+            $created = createUser($nom, $prenom, $email, $password);
+
+            if ($created) {
+                $_SESSION['flash_success'] = 'Compte créé avec succès. Vous pouvez vous connecter.';
+                header('Location: login.php');
+                exit;
+            }
+
+            $message = "Impossible de créer votre compte pour le moment.";
         }
     } else {
-        $message = "<font color='red'>Mot de passe trop court !</font>";
+        $message = "Merci de remplir tous les champs du formulaire.";
     }
-} else {
-
-    $message = "<font color='red'>Tous les champs ne sont pas remplis !</font>";
-}
 }
 
-
-// La fonction qui permet à l'utilisateur de créer son compte
-function userRegister($nom, $prenom, $email, $motpass,  $Cle, $token)
+function emailExists(string $email): bool
 {
-
     global $db;
-    $sql = "INSERT INTO users(nom_user, prenom_user, email_user, motpass_user, cle_user, token_user,  created) VALUES(:nom_user, :prenom_user, :email_user, :motpass_user, :cle_user, :token_user, NOW())";
-    $req = $db->prepare($sql);
-    $c = ([
 
-        'nom_user'        => $nom,
-        'prenom_user'     => $prenom,
-        'email_user'      => $email,
-        'motpass_user'    => sha1($motpass),
-        'cle_user'        => $Cle,
-        'token_user'      => $token,
+    $statement = $db->prepare('SELECT 1 FROM users WHERE email_user = :email LIMIT 1');
+    $statement->execute(['email' => $email]);
 
+    return (bool) $statement->fetchColumn();
+}
+
+function createUser(string $nom, string $prenom, string $email, string $password): bool
+{
+    global $db;
+
+    $statement = $db->prepare('INSERT INTO users (nom_user, prenom_user, email_user, motpass_user, cle_user, token_user, created, id_role)
+        VALUES (:nom, :prenom, :email, :password, :cle, :token, NOW(), :role)');
+
+    return $statement->execute([
+        'nom' => $nom,
+        'prenom' => $prenom,
+        'email' => $email,
+        'password' => password_hash($password, PASSWORD_DEFAULT),
+        'cle' => generateNumericKey(15),
+        'token' => bin2hex(random_bytes(16)),
+        'role' => 3,
     ]);
-    $req->execute($c);
 }
 
-
-// La fonction qui permet de verifier si l'email a déjà été utilisee
-function email_taken($email)
+function generateNumericKey(int $length): string
 {
+    $key = '';
 
-    global $db;
+    for ($i = 0; $i < $length; $i++) {
+        $key .= random_int(0, 9);
+    }
 
-    $e = ['email_user'     => $email];
-
-    $sql = "SELECT * FROM users WHERE email_user =:email_user";
-    $req = $db->prepare($sql);
-    $req->execute($e);
-    $free = $req->rowCount();
-
-    return $free;
-}
-
-// La fonction qui permet de generer un token à l'utilisateur crée
-function token($length)
-{
-
-    $chars = "azertyuiopqsdfghjklmwxcvbnAZERTYUIOPQSDFGHJKLMWXCVBN0123456789";
-    return substr(str_shuffle(str_repeat($chars, $length)), 0, $length);
+    return $key;
 }

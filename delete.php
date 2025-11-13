@@ -1,11 +1,28 @@
 <?php
-include 'layouts/header.php';
 
-$id = $_GET['id_etudiant'];
-$sql = "DELETE FROM etudiant WHERE id_etudiant =:id_etudiant";
-$query = $db->prepare($sql);
-$response = $query->execute(['id_etudiant' => $id]);
-if ($response) {
+declare(strict_types=1);
 
-    header("Location: read.php");
+require_once __DIR__ . '/functions/students.php';
+
+if (!isset($_SESSION['id_role']) || (int) $_SESSION['id_role'] !== 1) {
+    $_SESSION['flash_error'] = "Action non autorisée.";
+    header('Location: read.php');
+    exit;
 }
+
+$studentId = (int) ($_GET['id_etudiant'] ?? 0);
+
+if ($studentId <= 0) {
+    $_SESSION['flash_error'] = "Identifiant étudiant invalide.";
+    header('Location: read.php');
+    exit;
+}
+
+if (deleteStudent($studentId)) {
+    $_SESSION['flash_success'] = "L'étudiant a été supprimé.";
+} else {
+    $_SESSION['flash_error'] = "Impossible de supprimer cet étudiant.";
+}
+
+header('Location: read.php');
+exit;

@@ -1,17 +1,20 @@
 <?php
-// require('db.php');
 
-function etudiantSingle()
-{
-    global $db;
-    $sql = "SELECT * FROM etudiant JOIN promotion ON etudiant.id_promotion = promotion.id_promotion WHERE etudiant.id_etudiant='{$_GET['id_etudiant']}'";
+declare(strict_types=1);
 
-    $req = $db->query($sql);
+require_once __DIR__ . '/students.php';
 
-    $result = $req->fetchObject();
-    return $result;
+$studentId = (int) ($_GET['id_etudiant'] ?? 0);
+
+if ($studentId <= 0) {
+    header('Location: read.php');
+    exit;
 }
 
+$etudiant = getStudentById($studentId);
 
-
-$etudiant = etudiantSingle();
+if (!$etudiant) {
+    $_SESSION['flash_error'] = "L'étudiant demandé est introuvable.";
+    header('Location: read.php');
+    exit;
+}

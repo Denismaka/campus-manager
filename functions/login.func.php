@@ -1,133 +1,64 @@
 <?php
 
+declare(strict_types=1);
 
+require_once __DIR__ . '/db.php';
 
-if (isset($_POST['submit'])) {
-    
-    $email_user = isset($_POST['email_user']) ? trim(htmlspecialchars($_POST['email_user'])) : '';
-    $motpass_user = isset($_POST['motpass_user']) ? trim(htmlspecialchars($_POST['motpass_user'])) : '';
+$message = null;
 
-    if (!empty($email_user) && !empty($motpass_user)) {
-        
-        if (userConnect($email_user) == 1) {
-            $pas = userInfo($email_user, $motpass_user);
-            $motpass_user_hasher = sha1($motpass_user);
-            
-            if ($motpass_user_hasher == $pas['motpass_user']) {
-                $userInfo = userInfo($email_user, $motpass_user);
-                
-                if (is_array($userInfo)) {
-                  $userInfo = userInfo($email_user, $motpass_user);
-                      $_SESSION['id_user'] = $userInfo['id_user'];
-                      $_SESSION['nom_user'] = $userInfo['nom_user'];
-                      $_SESSION['prenom_user'] = $userInfo['prenom_user'];
-                      $_SESSION['email_user'] = $userInfo['email_user'];
-                      $_SESSION['motpass_user'] = $userInfo['motpass_user'];
-                      $_SESSION['id_role'] = $userInfo['id_role'];
-                      $_SESSION['confirmation_user'] = $userInfo['confirmation_user'];
-                      header('Location: create.php?id_user=' . $_SESSION['id_user']);
-                } else {
-                    $message = "<font color='red'>Erreur lors de la récupération des inforamations utilisateurs. </font>";
-                }
-        } else {
-            $message = "<font color='red'>Mot de passe incorrect !</font>";
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = trim(strtolower(filter_input(INPUT_POST, 'email_user', FILTER_VALIDATE_EMAIL) ?? ''));
+    $password = trim(filter_input(INPUT_POST, 'motpass_user') ?? '');
+
+    if ($email && $password) {
+        $user = findUserByEmail($email);
+
+        if ($user && password_verify($password, $user['motpass_user'])) {
+            if (password_needs_rehash($user['motpass_user'], PASSWORD_DEFAULT)) {
+                upgradeUserPasswordHash((int) $user['id_user'], $password);
+                $user = findUserByEmail($email) ?: $user;
+            }
+
+            createUserSession($user);
+            $_SESSION['flash_success'] = 'Connexion réussie. Bienvenue !';
+            header('Location: create.php');
+            exit;
         }
-        } else {
-            $message = "<font color='red'>Cet utilisateur n'existe pas !</font>";
-        }
+
+        $message = "Identifiants incorrects. Veuillez réessayer.";
     } else {
-        $message = "<font color='red'>Tous les champs ne sont pas remplis !</font>";
+        $message = "Veuillez renseigner un email valide et un mot de passe.";
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// if (isset($_POST['submit'])) {
-//     $email_user = htmlspecialchars(trim($_POST['email_user']));
-//     $motpass_user = htmlspecialchars(trim($_POST['motpass_user']));
-
-//     // echo(sha1($motpass_user));
-//     if (!empty($email_user) && !empty($motpass_user)) {
-
-
-//         if (userConnect($email_user) == 1) {
-
-//             $pas = userInfo($email_user, $motpass_user);
-
-//             $motpass_user_hasher = sha1($motpass_user);
-
-//             if ($motpass_user_hasher === $pas['motpass_user']) {
-//                 $userInfo = userInfo($email_user, $motpass_user);
-//                 $_SESSION['id_user'] = $userInfo['id_user'];
-//                 $_SESSION['nom_user'] = $userInfo['nom_user'];
-//                 $_SESSION['prenom_user'] = $userInfo['prenom_user'];
-//                 $_SESSION['email_user'] = $userInfo['email_user'];
-//                 $_SESSION['motpass_user'] = $userInfo['motpass_user'];
-//                 // $_SESSION['id_role'] = $userInfo['id_role'];
-//                 $_SESSION['confirmation_user'] = $userInfo['confirmation_user'];
-
-//                 header('Location: create.php?id_user=' . $_SESSION['id_user']);
-//             } else {
-//                 $message = "<font color='red'>Mot de passe incorrect !</font>";
-//             }
-//         } else {
-
-//             $message = "<font color='red'>Cet utilisateur n'existe pas ! ";
-//         }
-//     } else {
-//         $message = "<font color='red'>Tous les champs ne sont pas remplis !</font>";
-//     }
-// }
-
-
-// Permet la connection de users à la DB
-function userConnect($email_user)
+function findUserByEmail(string $email): ?array
 {
-    $motpass_user = htmlspecialchars(trim($_POST['motpass_user']));
     global $db;
 
-    $a = ['email_user' => $email_user];
+    $statement = $db->prepare('SELECT * FROM users WHERE email_user = :email LIMIT 1');
+    $statement->execute(['email' => $email]);
+    $user = $statement->fetch();
 
-    $sql = "SELECT * FROM users WHERE email_user = :email_user";
-    $req = $db->prepare($sql);
-    $req->execute($a);
-
-    $exist = $req->rowCount();
-
-    return $exist;
+    return $user ?: null;
 }
 
-
-// Permet de récuperé toutes les informations de l'user à la DB
-function userInfo($email_user, $motpass_user)
+function upgradeUserPasswordHash(int $userId, string $plainPassword): void
 {
-
     global $db;
 
-    $a = [
+    $statement = $db->prepare('UPDATE users SET motpass_user = :hash WHERE id_user = :id');
+    $statement->execute([
+        'hash' => password_hash($plainPassword, PASSWORD_DEFAULT),
+        'id' => $userId,
+    ]);
+}
 
-        'email_user'     => $email_user,
-        'motpass_user'   => sha1($motpass_user)
-    ];
-
-
-    $sql = "SELECT * FROM users WHERE email_user = :email_user AND motpass_user = :motpass_user";
-    $req = $db->prepare($sql);
-    $req->execute($a);
-
-    $exist = $req->fetch();
-
-    return $exist;
+function createUserSession(array $user): void
+{
+    $_SESSION['id_user'] = (int) $user['id_user'];
+    $_SESSION['nom_user'] = $user['nom_user'];
+    $_SESSION['prenom_user'] = $user['prenom_user'];
+    $_SESSION['email_user'] = $user['email_user'];
+    $_SESSION['id_role'] = (int) ($user['id_role'] ?? 3);
+    $_SESSION['confirmation_user'] = $user['confirmation_user'] ?? null;
 }
