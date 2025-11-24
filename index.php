@@ -1,5 +1,8 @@
 <?php require_once 'layouts/header.php'; ?>
 
+<!-- ############## -->
+<!-- Home -->
+<!-- ############## -->
 <section class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-900 via-slate-900 to-slate-950 shadow-2xl shadow-brand-900/40">
     <div class="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top,_#ffffff22,_transparent_50%)]"></div>
     <div class="relative px-8 py-16 sm:px-16">
@@ -48,6 +51,9 @@
     </div>
 </section>
 
+<!-- ############## -->
+<!-- Campus -->
+<!-- ############## -->
 <section class="mt-16 rounded-3xl border border-slate-800/60 bg-slate-900/40 p-8">
     <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
